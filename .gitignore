@@ -1,0 +1,10 @@
+node_modules/
+out/
+build/
+.trash/
+*.tmp
+# путь к ffmpeg на конкретной машине — редактор пишет его сам
+presbuilder.config.json
+.claude/settings.local.json
+.DS_Store
+Thumbs.db

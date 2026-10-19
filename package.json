@@ -1,0 +1,32 @@
+{
+  "name": "presbuilder",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Анимированные ролики из текста озвучки: редактор + сцены, которые пишет ИИ-агент (Claude Code, Codex)",
+  "license": "MIT",
+  "repository": "github:xaidan777/PressBuilder",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "new": "node tools/new.mjs",
+    "check": "node tools/check.mjs",
+    "timing": "node tools/timing.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  },
+  "dependencies": {
+    "@preact/signals": "^2.11.2",
+    "preact": "^10.29.8"
+  },
+  "optionalDependencies": {
+    "ffmpeg-static": "^5.2.0"
+  }
+}

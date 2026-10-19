@@ -1,0 +1,112 @@
+<!doctype html>
+<!--
+  Контактный лист кадров для проверки сцен без редактора (открывать на дев-сервере):
+    /tools/frame.html?deck=<id>&slide=s05          — 9 кадров слайда сеткой 3×3
+    /tools/frame.html?deck=<id>&t=42               — один кадр на всю страницу
+    /tools/frame.html?deck=<id>&slide=s05&n=4      — 4 кадра сеткой 2×2
+    /tools/frame.html?deck=<id>&slide=s05&file=s05_x  — сцена прямо из файла, без index.ts
+    /tools/frame.html?deck=<id>&slide=s05&from=2&to=4  — кадры только из этого окна слайда
+  Снимок без окна:  msedge --headless=new --window-size=1920,1080 --virtual-time-budget=8000
+                    --screenshot=<файл.png> "<url>"
+-->
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>frame</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #111;
+        overflow: hidden;
+      }
+      canvas {
+        display: block;
+      }
+      @font-face {
+        font-family: 'Sofia Sans Extra Condensed';
+        src: url('/src/fonts/SofiaSansExtraCondensed-Bold.ttf') format('truetype');
+        font-weight: 100 900;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c" width="1920" height="1080"></canvas>
+    <script type="module">
+      import { Timeline } from '/src/engine/timeline.ts';
+      import { drawBackground } from '/src/engine/background.ts';
+      import { DISPLAY_FAMILY, FONT } from '/src/engine/theme.ts';
+
+      const q = new URLSearchParams(location.search);
+      const id = q.get('deck');
+      const deck = await (await fetch(`/api/decks/${id}`)).json();
+      // file=s05_x,s06_y — взять сцены прямо из файлов, минуя index.ts
+      const files = (q.get('file') ?? '').split(',').filter(Boolean);
+      const scenes = new Map();
+      if (files.length) {
+        for (const f of files) {
+          const m = await import(`/src/decks/${id}/${f.replace(/\.ts$/, '')}.ts?v=${Date.now()}`);
+          for (const v of Object.values(m)) if (v && typeof v.render === 'function' && typeof v.id === 'string') scenes.set(v.id, v);
+        }
+      } else {
+        const mod = await import(`/src/decks/${id}/index.ts`);
+        for (const s of mod.SCENES ?? []) scenes.set(s.id, s);
+      }
+      try {
+        await document.fonts.load(`700 120px "${DISPLAY_FAMILY}"`);
+        await document.fonts.load(`small-caps 700 120px "${DISPLAY_FAMILY}"`);
+      } catch {}
+      const tl = new Timeline(deck, scenes);
+      const out = document.getElementById('c');
+      const octx = out.getContext('2d');
+
+      const frame = document.createElement('canvas');
+      frame.width = 1920;
+      frame.height = 1080;
+      const ctx = frame.getContext('2d');
+      const draw = (gt) => {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        drawBackground(ctx, gt, tl.energyAt(gt));
+        tl.render(ctx, gt);
+      };
+
+      const slideId = q.get('slide');
+      if (slideId) {
+        const sc = tl.schedule.slides.find((s) => s.slide.id === slideId);
+        const n = Number(q.get('n') ?? 9);
+        const cols = Math.ceil(Math.sqrt(n));
+        const rows = Math.ceil(n / cols);
+        const cw = 1920 / cols;
+        const ch = 1080 / rows;
+        octx.fillStyle = '#111';
+        octx.fillRect(0, 0, 1920, 1080);
+        for (let i = 0; i < n; i++) {
+          // от середины въезда до конца последней реплики
+          // from/to — окно в секундах от начала слайда (по умолчанию весь слайд)
+          const t0 = q.get('from') ? sc.start + Number(q.get('from')) : sc.start + sc.lead * 0.9;
+          const t1 = q.get('to') ? sc.start + Number(q.get('to')) : sc.start + sc.dur - sc.tail * 0.6;
+          const gt = t0 + ((t1 - t0) * (i + 1)) / n;
+          draw(gt);
+          const x = (i % cols) * cw;
+          const y = Math.floor(i / cols) * ch;
+          octx.drawImage(frame, x + 2, y + 2, cw - 4, ch - 4);
+          octx.fillStyle = 'rgba(0,0,0,0.6)';
+          octx.fillRect(x + 2, y + 2, 190, 34);
+          octx.fillStyle = '#ffcf75';
+          octx.font = `20px ${FONT.mono}`;
+          octx.fillText(`${slideId} +${(gt - sc.start).toFixed(1)}s`, x + 10, y + 26);
+        }
+        const errs = [...tl.errors.entries()].map(([k, v]) => `${k}: ${v}`).join(' | ');
+        if (errs) {
+          octx.fillStyle = '#ff7b6b';
+          octx.font = `28px ${FONT.mono}`;
+          octx.fillText(errs.slice(0, 120), 20, 1060);
+        }
+      } else {
+        draw(Number(q.get('t') ?? 0));
+        octx.drawImage(frame, 0, 0);
+      }
+      document.title = 'ready';
+    </script>
+  </body>
+</html>
