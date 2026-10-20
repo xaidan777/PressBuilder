@@ -54,6 +54,23 @@ const clock: IconFn = (ctx, x, y, s, color, t = 0) => {
   ctx.restore();
 };
 
+/** Микрофон — озвучка, звуковая дорожка. */
+const mic: IconFn = (ctx, x, y, s, color) => {
+  const r = begin(ctx, x, y, s, color);
+  rrPath(ctx, -r * 0.3, -r * 0.92, r * 0.6, r * 1.1, r * 0.3);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.58, -r * 0.12);
+  ctx.quadraticCurveTo(-r * 0.58, r * 0.5, 0, r * 0.5);
+  ctx.quadraticCurveTo(r * 0.58, r * 0.5, r * 0.58, -r * 0.12);
+  ctx.moveTo(0, r * 0.5);
+  ctx.lineTo(0, r * 0.9);
+  ctx.moveTo(-r * 0.36, r * 0.9);
+  ctx.lineTo(r * 0.36, r * 0.9);
+  ctx.stroke();
+  ctx.restore();
+};
+
 const calendar: IconFn = (ctx, x, y, s, color) => {
   const r = begin(ctx, x, y, s, color);
   rrPath(ctx, -r * 0.9, -r * 0.72, r * 1.8, r * 1.6, r * 0.2);
@@ -825,6 +842,7 @@ export const ICONS: Record<string, IconFn> = {
   money,
   clock,
   calendar,
+  mic,
   globe,
   robot,
   warning,

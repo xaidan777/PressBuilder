@@ -33,7 +33,7 @@ export function a(hex: string, alpha: number): string {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
-/** Смешение двух hex-цветов. */
+/** Смешение двух hex-цветов; результат — тоже hex (годится для `a()` и графиков). */
 export function mix(hexA: string, hexB: string, k: number): string {
   const p = (h: string) => {
     const n = parseInt(h.replace('#', ''), 16);
@@ -41,8 +41,11 @@ export function mix(hexA: string, hexB: string, k: number): string {
   };
   const [r1, g1, b1] = p(hexA);
   const [r2, g2, b2] = p(hexB);
-  const m = (x: number, y: number) => Math.round(x + (y - x) * k);
-  return `rgb(${m(r1, r2)}, ${m(g1, g2)}, ${m(b1, b2)})`;
+  const m = (x: number, y: number) =>
+    Math.round(x + (y - x) * Math.max(0, Math.min(1, k)))
+      .toString(16)
+      .padStart(2, '0');
+  return `#${m(r1, r2)}${m(g1, g2)}${m(b1, b2)}`;
 }
 
 export const FONT = {

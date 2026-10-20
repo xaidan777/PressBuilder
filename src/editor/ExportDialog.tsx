@@ -84,6 +84,9 @@ export function ExportDialog({ onClose, autoStart, slides }: { onClose(): void; 
         to: range?.to,
         fps: f.fps,
         bitrate: f.bitrate * 1_000_000,
+        audio: cur.audio
+          ? { path: `${cur.id}/${cur.audio.file}`, offset: cur.audio.offset ?? 0, volume: cur.audio.volume ?? 1 }
+          : undefined,
         signal: abort.current.signal,
         onProgress: (k, frame, total) => {
           if (k >= 1) return setPhase({ kind: 'mux' });
@@ -122,7 +125,7 @@ export function ExportDialog({ onClose, autoStart, slides }: { onClose(): void; 
         ) : (
           <>
             <span class="muted is-grow">
-              {frames.toLocaleString('ru-RU')} кадров → out/{d.id}.mp4
+              {frames.toLocaleString('ru-RU')} кадров{d.audio ? ` + звук ${d.audio.file}` : ''} → out/{d.id}.mp4
             </span>
             <button type="button" class="btn" onClick={onClose}>
               Закрыть

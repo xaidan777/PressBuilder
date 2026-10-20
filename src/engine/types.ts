@@ -56,6 +56,16 @@ export interface DeckFormat {
   bitrate: number;
 }
 
+/** Звуковая дорожка с голосом. Файл лежит в папке ролика, его кладёт редактор. */
+export interface DeckAudio {
+  /** Имя файла в `src/decks/<id>/`, например `voice.mp3`. */
+  file: string;
+  /** С какой секунды ролика звучит начало дорожки (меньше 0 — начало дорожки срезано). */
+  offset?: number;
+  /** Громкость 0..1, по умолчанию 1. */
+  volume?: number;
+}
+
 export interface DeckData {
   id: string;
   title: string;
@@ -71,6 +81,8 @@ export interface DeckData {
   tail?: number;
   format: DeckFormat;
   slides: SlideData[];
+  /** Озвучка: играет в редакторе и попадает в MP4. */
+  audio?: DeckAudio;
 }
 
 // ------------------------------------------------------------------ рендер

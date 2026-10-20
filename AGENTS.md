@@ -21,10 +21,12 @@ src/decks/<id>/deck.json      данные (пишет редактор, авт�
   slides[]: id ("s01"), label, lead?, tail?,
             cues[]: id, say (озвучка), show? (на экране), hold?, rate?, dur? (ручная длительность)
             objects?: { "<id объекта>": { x?, y?, scale?, text?, hidden? } }   ← правки из редактора
+  audio?: { file, offset?, volume? }   ← озвучка: файл в папке ролика, с какой секунды звучит, громкость
 src/decks/<id>/sNN_имя.ts     сцена слайда (SceneDef), index.ts — список сцен, common.ts — общие блоки
+src/decks/<id>/voice.mp3      озвучка (кнопка «Добавить звук» на таймлайне); попадает в MP4
 ```
 
-В deck.json не менять `say`, `target`, `format`, `objects`. Чужие ролики не трогать.
+В deck.json не менять `say`, `target`, `format`, `objects`, `audio`. Чужие ролики не трогать.
 
 ## Команды
 
@@ -34,6 +36,7 @@ node tools/new.mjs <id> <текст.txt> --title "…"   новая тема и�
 npx tsc --noEmit                    типы
 node tools/check.mjs <id>           прогон всех сцен без браузера
 node tools/timing.mjs <id>          раскладка реплик по времени
+node tools/align.mjs <id> [--write] подогнать тайминги реплик под паузы озвучки
 ```
 
 ## Структура
@@ -41,8 +44,9 @@ node tools/timing.mjs <id>          раскладка реплик по вре�
 ```
 server/plugin.ts      API редактора: /api/decks, /api/export, /api/config, /out
 src/engine/           движок: тайминги, расписание, разбивка текста, рендер и объекты (timeline),
-                      экспорт (WebCodecs → H.264), заглушка, текст, графика, виджеты, иконки, псевдо-3D
+                      экспорт (WebCodecs → H.264, озвучка — ffmpeg), заглушка, текст, графика, виджеты,
+                      иконки, псевдо-3D, блоки сцен (kit), скелет (rig), картинки (assets)
 src/editor/           интерфейс редактора
-src/decks/<id>/       ролики; atlas-converter, llm3d, hexstorm — примеры
-tools/                new.mjs, check.mjs, timing.mjs, frame.html (кадры сеткой для проверки)
+src/decks/<id>/       ролики; gameready-3d — пример
+tools/                new.mjs, check.mjs, timing.mjs, align.mjs, frame.html (кадры сеткой для проверки)
 ```

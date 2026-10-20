@@ -4,7 +4,7 @@
  * и на диск.
  */
 
-import { computed, signal } from '@preact/signals';
+import { computed, effect, signal } from '@preact/signals';
 import { loadScenes } from '../decks/registry.ts';
 import { Player } from '../engine/player.ts';
 import { slideAt } from '../engine/schedule.ts';
@@ -12,6 +12,7 @@ import { Timeline, type ObjInfo } from '../engine/timeline.ts';
 import { W } from '../engine/theme.ts';
 import type { DeckData, SceneDef } from '../engine/types.ts';
 import { api, CLIENT_ID, type DeckMeta } from './api.ts';
+import { loadPeaks, type AudioInfo } from './audio.ts';
 
 export type Selection =
   | { kind: 'none' }
@@ -65,6 +66,23 @@ export const activeCue = computed(() => {
 });
 export const hasScenes = computed(() => scenes.value.size > 0);
 
+// ------------------------------------------------------------------ озвучка
+
+/** Счётчик загрузок файла озвучки: тот же `voice.mp3` после замены нужно перечитать. */
+export const audioRev = signal(0);
+/** Звук выключен в редакторе (на MP4 не влияет). */
+export const muted = signal(false);
+export const audioSrc = computed(() => {
+  const d = deck.value;
+  return d?.audio?.file ? `/src/decks/${d.id}/${encodeURIComponent(d.audio.file)}?r=${audioRev.value}` : null;
+});
+/** Длительность и волна текущей озвучки; null — нет дорожки или ещё читается. */
+export const audioInfo = signal<AudioInfo | null>(null);
+const audioKey = computed(() => {
+  const a = deck.value?.audio;
+  return `${audioSrc.value}|${a?.offset ?? 0}|${a?.volume ?? 1}|${muted.value}`;
+});
+
 let toastTimer = 0;
 export function say(message: string): void {
   toast.value = message;
@@ -92,12 +110,38 @@ export function attachPlayer(canvas: HTMLCanvasElement): Player {
   p.onDraw = () => requestProbe();
   p.start();
   player = p;
+  applyAudio();
   // удобно из консоли: pres.seek(42)
   (window as unknown as { pres: Player }).pres = p;
   return p;
 }
 
 timeline.subscribe((tl) => player?.setTimeline(tl));
+
+/** Передать плееру дорожку, сдвиг, громкость и «без звука». */
+function applyAudio(): void {
+  const a = deck.peek()?.audio;
+  player?.setAudio(audioSrc.peek(), a?.offset ?? 0, a?.volume ?? 1);
+  player?.setMuted(muted.peek());
+}
+audioKey.subscribe(() => applyAudio());
+
+// волна читается один раз на файл
+let peaksFor = '';
+effect(() => {
+  const src = audioSrc.value;
+  if (src === peaksFor) return;
+  peaksFor = src ?? '';
+  audioInfo.value = null;
+  if (!src) return;
+  loadPeaks(src)
+    .then((info) => {
+      if (peaksFor === src) audioInfo.value = info;
+    })
+    .catch(() => {
+      if (peaksFor === src) say('Файл озвучки не читается — проверь формат (mp3, wav, m4a…)');
+    });
+});
 
 /** Пересчитать рамки объектов текущего кадра — с задержкой, чтобы не мешать перемотке. */
 export function requestProbe(delay = 70): void {

@@ -168,6 +168,11 @@ export interface RevealOpts {
   slide?: number;
   /** Масштаб на старте. */
   from?: number;
+  /**
+   * Слова выезжают снизу «из-под маски» своей строки, без прозрачности —
+   * плотная подача заголовков. `rise` тогда не нужен.
+   */
+  mask?: boolean;
 }
 
 /**
@@ -192,6 +197,7 @@ export function reveal(
   const n = boxes.length || 1;
   const span = 1 + stagger * (n - 1);
   const step = lineStep(st);
+  const size = sizeOf(st);
 
   ctx.save();
   applyStyle(ctx, st);
@@ -200,9 +206,17 @@ export function reveal(
     const wp = clamp01(pr * span - i * stagger);
     if (wp <= 0) return;
     const e = easeOutQuart(wp);
+    const by = y + b.line * step;
     ctx.save();
-    ctx.globalAlpha *= e;
-    ctx.translate(b.x + slide * (1 - e), y + b.line * step + rise * (1 - e));
+    if (o.mask) {
+      ctx.beginPath();
+      ctx.rect(b.x - size * 0.1, by - size * 1.02, b.width + size * 0.2, size * 1.28);
+      ctx.clip();
+      ctx.translate(b.x + slide * (1 - e), by + size * 1.15 * (1 - e));
+    } else {
+      ctx.globalAlpha *= e;
+      ctx.translate(b.x + slide * (1 - e), by + rise * (1 - e));
+    }
     if (o.from && o.from !== 1) {
       const s = o.from + (1 - o.from) * e;
       ctx.scale(s, s);

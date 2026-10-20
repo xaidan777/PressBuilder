@@ -3,7 +3,8 @@
  *
  *   /api/decks            список, создание, чтение, сохранение и удаление роликов
  *                         (данные лежат в src/decks/<id>/deck.json)
- *   /api/export/*         приёмник покадрового экспорта: H.264-поток → out/<id>.mp4
+ *   /api/decks/<id>/audio загрузка озвучки → src/decks/<id>/voice.<ext>
+ *   /api/export/*         приёмник покадрового экспорта: H.264-поток (+ озвучка) → out/<id>.mp4
  *   /api/config           путь к ffmpeg (presbuilder.config.json → $FFMPEG → ffmpeg-static → PATH)
  *   /out/<файл>           готовые ролики — чтобы открыть результат из редактора
  *
@@ -25,6 +26,7 @@ const TRASH_DIR = path.join(ROOT, '.trash');
 const CONFIG_FILE = path.join(ROOT, 'presbuilder.config.json');
 
 const ID_RE = /^[a-z0-9][a-z0-9_-]{0,40}$/;
+const AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg|oga|opus|flac|webm)$/i;
 
 interface Config {
   ffmpeg?: string;
@@ -140,6 +142,9 @@ export function presbuilder(): Plugin {
       return fail(res, 405, 'method');
     }
 
+    const audio = /^([^/]+)\/audio$/.exec(rest);
+    if (audio) return audioApi(req, res, audio[1]);
+
     const id = rest;
     if (!ID_RE.test(id)) return fail(res, 400, 'bad id');
     const file = deckFile(id);
@@ -172,20 +177,58 @@ export function presbuilder(): Plugin {
     return fail(res, 405, 'method');
   }
 
+  /** Озвучка: файл кладётся в папку ролика как voice.<ext>, прежний — удаляется. */
+  async function audioApi(req: IncomingMessage, res: ServerResponse, id: string): Promise<void> {
+    if (!ID_RE.test(id) || !fs.existsSync(deckFile(id))) return fail(res, 404, `Нет ролика «${id}»`);
+    if (req.method !== 'PUT') return fail(res, 405, 'method');
+    const name = new URL(req.url ?? '/', 'http://x').searchParams.get('name') ?? '';
+    const ext = AUDIO_EXT.exec(name)?.[1]?.toLowerCase();
+    if (!ext) return fail(res, 400, 'Нужен звуковой файл: mp3, wav, m4a, aac, ogg, opus, flac или webm');
+    const buf = await readBody(req);
+    if (!buf.length) return fail(res, 400, 'Файл пустой');
+    const dir = path.join(DECKS_DIR, id);
+    for (const f of fs.readdirSync(dir)) if (/^voice\./.test(f)) fs.rmSync(path.join(dir, f), { force: true });
+    const file = `voice.${ext}`;
+    fs.writeFileSync(path.join(dir, file), buf);
+    return json(res, { file, size: buf.length });
+  }
+
   // ---------------------------------------------------------------- экспорт
 
   let stream: fs.WriteStream | null = null;
   let raw = '';
   let mp4 = '';
   let fps = 60;
+  /** Озвучка текущего экспорта: где лежит, где начинается в ролике, какой кусок ролика пишем. */
+  let voice: { file: string; offset: number; volume: number; from: number; dur: number } | null = null;
+
+  /** Аргументы ffmpeg для звука: срез начала, задержка, громкость, обрезка по длине видео. */
+  function voiceArgs(): { input: string[]; output: string[] } {
+    if (!voice) return { input: [], output: [] };
+    const skip = voice.from - voice.offset;
+    const delay = -skip;
+    const filters = [
+      ...(delay > 0.001 ? [`adelay=${Math.round(delay * 1000)}:all=1`] : []),
+      ...(voice.volume !== 1 ? [`volume=${voice.volume}`] : []),
+    ];
+    return {
+      input: [...(skip > 0.001 ? ['-ss', skip.toFixed(3)] : []), '-i', voice.file],
+      output: [
+        '-map', '1:a:0', '-c:a', 'aac', '-b:a', '192k',
+        ...(filters.length ? ['-af', filters.join(',')] : []),
+        ...(voice.dur > 0 ? ['-t', voice.dur.toFixed(3)] : []),
+      ],
+    };
+  }
 
   function mux(): Promise<{ file: string; size: number }> {
     return new Promise((resolve, reject) => {
       // время кадров — строго по номеру кадра: сырой H.264 без отметок, и ffmpeg (сборки 2025) иначе
       // расставляет их неверно — файл играет целиком, а длительность в заголовке — доли секунды
       const ts = `${fps}*TB`;
-      const args = ['-y', '-f', 'h264', '-framerate', String(fps), '-i', raw, '-c:v', 'copy',
-        '-bsf:v', `setts=pts=N/(${ts}):dts=N/(${ts}):duration=1/(${ts})`, '-movflags', '+faststart', mp4];
+      const a = voiceArgs();
+      const args = ['-y', '-f', 'h264', '-framerate', String(fps), '-i', raw, ...a.input, '-map', '0:v:0', '-c:v', 'copy',
+        '-bsf:v', `setts=pts=N/(${ts}):dts=N/(${ts}):duration=1/(${ts})`, ...a.output, '-movflags', '+faststart', mp4];
       let err = '';
       const ff = spawn(ffmpegPath(), args, { stdio: ['ignore', 'ignore', 'pipe'] });
       ff.stderr?.on('data', (c: Buffer) => (err = (err + c.toString()).slice(-600)));
@@ -206,6 +249,18 @@ export function presbuilder(): Plugin {
     if (rest === 'start') {
       fps = Number(url.searchParams.get('fps') ?? 60) || 60;
       const name = (url.searchParams.get('name') ?? '').replace(/[^\w-]/g, '') || 'presentation';
+      // озвучка: путь «<id>/<файл>» внутри src/decks, сдвиг и громкость — из deck.json
+      voice = null;
+      const audio = url.searchParams.get('audio');
+      if (audio) {
+        const file = path.resolve(DECKS_DIR, audio);
+        if (!file.startsWith(DECKS_DIR + path.sep) || !fs.existsSync(file)) return fail(res, 404, `Нет файла озвучки: ${audio}`);
+        const num = (k: string, d: number) => {
+          const v = Number(url.searchParams.get(k) ?? d);
+          return Number.isFinite(v) ? v : d;
+        };
+        voice = { file, offset: num('offset', 0), volume: num('volume', 1), from: num('from', 0), dur: num('dur', 0) };
+      }
       fs.mkdirSync(OUT_DIR, { recursive: true });
       stream?.destroy();
       raw = path.join(OUT_DIR, `${name}.h264`);

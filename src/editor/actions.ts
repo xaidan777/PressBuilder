@@ -2,7 +2,8 @@
 
 import { autoLabel } from '../engine/split.ts';
 import type { Cue, DeckData, ObjOverride, SlideData } from '../engine/types.ts';
-import { sel, update, type UpdateOpts } from './store.ts';
+import { api } from './api.ts';
+import { audioInfo, audioRev, deck, say, sel, update, type UpdateOpts } from './store.ts';
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
@@ -220,4 +221,50 @@ export function resetObj(slideId: string, objId: string): void {
     delete s.objects[objId];
     if (!Object.keys(s.objects).length) delete s.objects;
   });
+}
+
+// ------------------------------------------------------------------ озвучка
+
+const AUDIO_FILE = /\.(mp3|wav|m4a|aac|ogg|oga|opus|flac|webm)$/i;
+
+/** Загрузить файл озвучки в папку ролика и подключить его (сдвиг и громкость сохраняются). */
+export async function attachAudio(file: File): Promise<void> {
+  const d = deck.peek();
+  if (!d) return;
+  if (!AUDIO_FILE.test(file.name)) return say('Нужен звуковой файл: mp3, wav, m4a, aac, ogg, opus, flac или webm');
+  say(`Загружаю озвучку «${file.name}»…`);
+  try {
+    const r = await api.uploadAudio(d.id, file);
+    audioRev.value++;
+    update((x) => void (x.audio = { file: r.file, offset: x.audio?.offset ?? 0, volume: x.audio?.volume ?? 1 }));
+    say(`Озвучка подключена: ${file.name}`);
+  } catch (e) {
+    say(`Озвучка не загрузилась: ${e instanceof Error ? e.message : e}`);
+  }
+}
+
+/** Убрать дорожку из ролика (файл остаётся в папке — отмена вернёт его). */
+export function removeAudio(): void {
+  update((x) => void delete x.audio);
+}
+
+/** С какой секунды ролика звучит начало дорожки. */
+export function setAudioOffset(offset: number, o: UpdateOpts = {}): void {
+  update((x) => {
+    if (x.audio) x.audio.offset = Math.round(offset * 100) / 100;
+  }, o);
+}
+
+export function setAudioVolume(volume: number): void {
+  update((x) => {
+    if (x.audio) x.audio.volume = Math.max(0, Math.min(1, Math.round(volume * 100) / 100));
+  }, { key: 'audio-volume' });
+}
+
+/** Хронометраж ролика = конец озвучки: всё расписание пропорционально подгоняется под голос. */
+export function fitToAudio(): void {
+  const info = audioInfo.peek();
+  if (!info) return;
+  update((x) => void (x.target = Math.round((info.duration + (x.audio?.offset ?? 0)) * 10) / 10));
+  say('Хронометраж подогнан под озвучку — границы реплик можно уточнить на таймлайне');
 }

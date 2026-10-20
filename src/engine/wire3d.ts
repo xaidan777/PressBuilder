@@ -13,9 +13,14 @@ export type V3 = [number, number, number];
 
 export interface Mesh {
   verts: V3[];
-  /** Грани выпуклого тела. Порядок обхода не важен: нормаль выправляется от центра. */
+  /**
+   * Грани. У выпуклого тела порядок обхода не важен: нормаль выправляется от центра.
+   * У `oriented` — обход против часовой стрелки, если смотреть снаружи (так строит `extrude`).
+   */
   faces: number[][];
   edges: Array<[number, number]>;
+  /** Нормали берутся из порядка обхода — для невыпуклых тел (выдавленный контур). */
+  oriented?: boolean;
 }
 
 export interface View {
@@ -73,6 +78,34 @@ function prism(n: number): Mesh {
     faces.push([i, j, n + j, n + i]);
   }
   return meshOf(verts, faces);
+}
+
+/**
+ * Выдавливание плоского контура в тело толщиной `depth` (контур в плоскости XY,
+ * Y вверх; вогнутый — можно). Так из знака «MY» получается объёмный логотип:
+ * `extrude(ICON_POINTS.map(([u, v]) => [(u - 0.5) * ICON_ASPECT, 0.5 - v]), 0.3)`.
+ */
+export function extrude(pts: Array<[number, number]>, depth: number): Mesh {
+  let area = 0;
+  pts.forEach(([x1, y1], i) => {
+    const [x2, y2] = pts[(i + 1) % pts.length];
+    area += x1 * y2 - x2 * y1;
+  });
+  const ring = area >= 0 ? pts : [...pts].reverse();
+  const n = ring.length;
+  const verts: V3[] = [
+    ...ring.map(([x, y]): V3 => [x, y, depth / 2]),
+    ...ring.map(([x, y]): V3 => [x, y, -depth / 2]),
+  ];
+  const faces: number[][] = [
+    Array.from({ length: n }, (_, i) => i),
+    Array.from({ length: n }, (_, i) => 2 * n - 1 - i),
+  ];
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    faces.push([i, n + i, n + j, j]);
+  }
+  return { ...meshOf(verts, faces), oriented: true };
 }
 
 const PHI = (1 + Math.sqrt(5)) / 2;
@@ -183,14 +216,21 @@ export const MESH = {
 
 const sub = (p: V3, q: V3): V3 => [p[0] - q[0], p[1] - q[1], p[2] - q[2]];
 const dot = (p: V3, q: V3) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
-const cross = (p: V3, q: V3): V3 => [
-  p[1] * q[2] - p[2] * q[1],
-  p[2] * q[0] - p[0] * q[2],
-  p[0] * q[1] - p[1] * q[0],
-];
 function unit(v: V3): V3 {
   const l = Math.hypot(v[0], v[1], v[2]) || 1;
   return [v[0] / l, v[1] / l, v[2] / l];
+}
+
+/** Нормаль многоугольника методом Ньюэлла — верна и для невыпуклых граней. */
+function newell(pts: V3[]): V3 {
+  const n: V3 = [0, 0, 0];
+  pts.forEach((p, i) => {
+    const q = pts[(i + 1) % pts.length];
+    n[0] += (p[1] - q[1]) * (p[2] + q[2]);
+    n[1] += (p[2] - q[2]) * (p[0] + q[0]);
+    n[2] += (p[0] - q[0]) * (p[1] + q[1]);
+  });
+  return n;
 }
 
 /** Модель → мир: масштаб, собственное вращение, перенос. */
@@ -304,8 +344,8 @@ export function drawSolid(ctx: Ctx, mesh: Mesh, view: View, xf: Xform, o: SolidO
       mid[1] += cam[i][1] / f.length;
       mid[2] += cam[i][2] / f.length;
     }
-    let n = unit(cross(sub(cam[f[1]], cam[f[0]]), sub(cam[f[2]], cam[f[0]])));
-    if (dot(n, sub(mid, center)) < 0) n = [-n[0], -n[1], -n[2]];
+    let n = unit(newell(f.map((i) => cam[i])));
+    if (!mesh.oriented && dot(n, sub(mid, center)) < 0) n = [-n[0], -n[1], -n[2]];
     const toCam: V3 = Number.isFinite(d) ? [-mid[0], -mid[1], d - mid[2]] : [0, 0, 1];
     if (dot(n, toCam) <= 0) continue;
     visible.push({ f, z: mid[2], light: Math.max(0, dot(n, LIGHT)) });
@@ -432,4 +472,71 @@ export function groundPath(ctx: Ctx, view: View, pts: Array<[number, number]>, y
     else ctx.moveTo(sx, sy);
   });
   ctx.closePath();
+}
+
+// ---------------------------------------------------------------- шар: toon и реалистичный
+
+/**
+ * Шар с затенением — для сравнения стилей. `toon` — три жёстких тона и контур,
+ * `real` — мягкий градиент, рефлекс от пола, блик и контактная тень.
+ */
+export function ball(ctx: Ctx, cx: number, cy: number, r: number, color: string, mode: 'toon' | 'real'): void {
+  const [cr, cg, cb] = rgbOf(color);
+  const tone = (k: number, al = 1) => `rgba(${Math.round(cr * k)}, ${Math.round(cg * k)}, ${Math.round(cb * k)}, ${al})`;
+  const lx = cx - r * 0.38;
+  const ly = cy - r * 0.42;
+  ctx.save();
+  // контактная тень
+  const sh = ctx.createRadialGradient(cx, cy + r * 1.02, 0, cx, cy + r * 1.02, r * 1.1);
+  sh.addColorStop(0, 'rgba(0,0,0,0.55)');
+  sh.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = sh;
+  ctx.save();
+  ctx.translate(cx, cy + r * 1.02);
+  ctx.scale(1, 0.22);
+  ctx.translate(-cx, -(cy + r * 1.02));
+  ctx.fillRect(cx - r * 1.2, cy + r * 1.02 - r * 1.2, r * 2.4, r * 2.4);
+  ctx.restore();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.save();
+  ctx.clip();
+  if (mode === 'toon') {
+    ctx.fillStyle = tone(0.42);
+    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    ctx.fillStyle = tone(0.78);
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.16, cy - r * 0.18, r * 0.9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = tone(1);
+    ctx.beginPath();
+    ctx.arc(lx + r * 0.08, ly + r * 0.08, r * 0.46, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    const g = ctx.createRadialGradient(lx, ly, r * 0.05, cx, cy, r * 1.05);
+    g.addColorStop(0, tone(1));
+    g.addColorStop(0.45, tone(0.75));
+    g.addColorStop(1, tone(0.16));
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    // рефлекс снизу и ободок
+    const b = ctx.createRadialGradient(cx + r * 0.2, cy + r * 1.1, 0, cx + r * 0.2, cy + r * 1.1, r * 0.9);
+    b.addColorStop(0, tone(0.9, 0.55));
+    b.addColorStop(1, tone(0.9, 0));
+    ctx.fillStyle = b;
+    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    const sp = ctx.createRadialGradient(lx, ly, 0, lx, ly, r * 0.32);
+    sp.addColorStop(0, 'rgba(255,255,255,0.95)');
+    sp.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sp;
+    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+  }
+  ctx.restore();
+  if (mode === 'toon') {
+    ctx.strokeStyle = '#0F0F0F';
+    ctx.lineWidth = Math.max(3, r * 0.05);
+    ctx.stroke();
+  }
+  ctx.restore();
 }

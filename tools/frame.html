@@ -36,6 +36,7 @@
       import { Timeline } from '/src/engine/timeline.ts';
       import { drawBackground } from '/src/engine/background.ts';
       import { DISPLAY_FAMILY, FONT } from '/src/engine/theme.ts';
+      import { assetsReady } from '/src/engine/assets.ts';
 
       const q = new URLSearchParams(location.search);
       const id = q.get('deck');
@@ -49,13 +50,15 @@
           for (const v of Object.values(m)) if (v && typeof v.render === 'function' && typeof v.id === 'string') scenes.set(v.id, v);
         }
       } else {
-        const mod = await import(`/src/decks/${id}/index.ts`);
+        // у свежей темы index.ts ещё нет — тогда все слайды рисует заглушка
+        const mod = await import(`/src/decks/${id}/index.ts`).catch(() => ({}));
         for (const s of mod.SCENES ?? []) scenes.set(s.id, s);
       }
       try {
         await document.fonts.load(`700 120px "${DISPLAY_FAMILY}"`);
         await document.fonts.load(`small-caps 700 120px "${DISPLAY_FAMILY}"`);
       } catch {}
+      await assetsReady();
       const tl = new Timeline(deck, scenes);
       const out = document.getElementById('c');
       const octx = out.getContext('2d');

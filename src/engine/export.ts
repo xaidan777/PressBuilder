@@ -9,6 +9,7 @@
  * на результат, каждый кадр рисуется столько, сколько нужно.
  */
 
+import { assetsReady } from './assets.ts';
 import type { Player } from './player.ts';
 
 export interface ExportOpts {
@@ -26,6 +27,8 @@ export interface ExportOpts {
   /** Кусок ролика: начало и конец, сек (по умолчанию — весь ролик). */
   from?: number;
   to?: number;
+  /** Озвучка: путь «<id>/<файл>» внутри src/decks, сдвиг и громкость (см. DeckAudio). */
+  audio?: { path: string; offset: number; volume: number };
 }
 
 export interface ExportResult {
@@ -93,9 +96,14 @@ export async function exportVideo(player: Player, o: ExportOpts = {}): Promise<E
   // Кадры не должны крутиться сами: экспорт управляет временем вручную.
   player.pause();
   player.stop();
+  // картинки сцен и шрифты — до первого кадра, иначе начало ролика уйдёт без них
+  await Promise.all([assetsReady(), document.fonts.ready]);
 
   const name = encodeURIComponent(o.name ?? 'presentation');
-  await post(`${endpoint}/start?fps=${fps}&w=${canvas.width}&h=${canvas.height}&name=${name}`);
+  const voice = o.audio
+    ? `&audio=${encodeURIComponent(o.audio.path)}&offset=${o.audio.offset}&volume=${o.audio.volume}&from=${from}&dur=${to - from}`
+    : '';
+  await post(`${endpoint}/start?fps=${fps}&w=${canvas.width}&h=${canvas.height}&name=${name}${voice}`);
 
   const cfg = await pickCodec(canvas.width, canvas.height, bitrate, fps);
 

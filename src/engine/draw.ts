@@ -168,6 +168,47 @@ export function hexPath(ctx: Ctx, cx: number, cy: number, r: number, rot = 0): v
   ctx.closePath();
 }
 
+/** Путь ромба (квадрат на 45°). `r` — от центра до вершины. */
+export function diamondPath(ctx: Ctx, cx: number, cy: number, r: number): void {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r);
+  ctx.lineTo(cx + r, cy);
+  ctx.lineTo(cx, cy + r);
+  ctx.lineTo(cx - r, cy);
+  ctx.closePath();
+}
+
+/** Выноска: тонкая линия от подписи к объекту с кружком на конце, рисуется по прогрессу `p`. */
+export function leader(
+  ctx: Ctx,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  p = 1,
+  color: string = a(C.text, 0.7),
+  lw = 2,
+): void {
+  const pr = clamp01(p);
+  if (pr <= 0) return;
+  const e = easeOutCubic(pr);
+  const ex = x1 + (x2 - x1) * e;
+  const ey = y1 + (y2 - y1) * e;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lw;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(ex, ey);
+  ctx.stroke();
+  ctx.fillStyle = C.bg;
+  ctx.beginPath();
+  ctx.arc(ex, ey, 7 + lw, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function polyline(ctx: Ctx, pts: Array<[number, number]>, close = false): void {
   ctx.beginPath();
   pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));

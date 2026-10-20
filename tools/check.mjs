@@ -3,7 +3,7 @@
  * на «пустом» канвасе. Ловит исключения в render(), реплики, которых нет в
  * deck.json, и показывает, какие объекты (f.obj) сцена отдаёт редактору.
  *
- *   node tools/check.mjs llm3d
+ *   node tools/check.mjs gameready-3d
  *
  * Нужен Node 23.6+ (исходники на TypeScript подключаются напрямую).
  */

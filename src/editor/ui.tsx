@@ -42,6 +42,9 @@ const ICONS = {
   back: <path d="M11 5l-7 7 7 7M4 12h16" />,
   pin: <path d="M9 3h6l-1 6 3 3v2H7v-2l3-3zM12 14v7" />,
   chevron: <path d="m6 9 6 6 6-6" />,
+  mic: <path d="M12 3.5a2.8 2.8 0 0 1 2.8 2.8v5a2.8 2.8 0 0 1-5.6 0v-5A2.8 2.8 0 0 1 12 3.5zM6.5 11a5.5 5.5 0 0 0 11 0M12 16.5V20.5M8.5 20.5h7" />,
+  sound: <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" />,
+  mute: <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4zM16 9.5l5 5M21 9.5l-5 5" />,
   gear: (
     <g>
       <circle cx="12" cy="12" r="3.2" />

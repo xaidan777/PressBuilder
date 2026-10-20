@@ -2,8 +2,8 @@
  * Раскладка ролика по времени: когда начинается каждый слайд и каждая реплика.
  * Удобно сверять с озвучкой на монтаже.
  *
- *   node tools/timing.mjs llm3d        # ролик из src/decks/llm3d
- *   node tools/timing.mjs llm3d 160    # примерить другой хронометраж, сек
+ *   node tools/timing.mjs gameready-3d        # ролик из src/decks/gameready-3d
+ *   node tools/timing.mjs gameready-3d 600    # примерить другой хронометраж, сек
  *
  * Нужен Node 23.6+ (исходники на TypeScript подключаются напрямую).
  */

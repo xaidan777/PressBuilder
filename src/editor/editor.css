@@ -1043,6 +1043,74 @@ kbd {
 .tl-track.is-cues {
   height: 46px;
 }
+.tl-track.is-audio {
+  height: 32px;
+}
+
+/* озвучка */
+.tl-audio {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(81, 211, 255, 0.1);
+  border: 1px solid rgba(81, 211, 255, 0.45);
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+.tl-audio:active {
+  cursor: grabbing;
+}
+.tl-audio canvas {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  pointer-events: none;
+}
+.tl-audio span {
+  position: absolute;
+  left: 8px;
+  top: 7px;
+  font: 600 11px 'Cascadia Mono', Consolas, monospace;
+  color: var(--h1);
+  white-space: nowrap;
+}
+.tl-audio-empty {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px dashed var(--line-2);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dim);
+  font-size: 12px;
+  cursor: pointer;
+}
+.tl-audio-empty:hover {
+  color: var(--text);
+  border-color: var(--h1);
+}
+.tl-audio-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 10px;
+  font: 12px 'Cascadia Mono', Consolas, monospace;
+  color: var(--h1);
+  white-space: nowrap;
+}
+.tl-audio-add {
+  margin-left: 10px;
+}
+.tl-scroll.is-dropping {
+  outline: 2px dashed var(--h1);
+  outline-offset: -2px;
+}
 
 .tl-slide,
 .tl-cue {
