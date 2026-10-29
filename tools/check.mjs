@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { Timeline } from '../src/engine/timeline.ts';
+import { setStyle } from '../src/engine/theme.ts';
 
 const [, , deckId] = process.argv;
 const dir = `src/decks/${deckId}`;
@@ -48,6 +49,7 @@ function fakeCanvas() {
 }
 
 const deck = JSON.parse(fs.readFileSync(`${dir}/deck.json`, 'utf8'));
+setStyle(deck.style);
 const indexFile = path.resolve(dir, 'index.ts');
 const scenes = new Map();
 if (fs.existsSync(indexFile)) {

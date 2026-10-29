@@ -291,12 +291,13 @@ export type CodeLine = Array<[string, TokKind]>;
 
 /** Подсветка кода: ключевые слова голубые, функции жёлтые, строки зелёные. */
 export const TOK_COLOR: Record<TokKind, string> = {
-  kw: C.h1,
-  fn: C.accent,
-  str: C.pos,
-  num: C.accent,
-  com: a(C.text, 0.4),
-  txt: C.text,
+  // геттеры: цвета берутся из стиля ролика в момент рисования
+  get kw() { return C.h1; },
+  get fn() { return C.accent; },
+  get str() { return C.pos; },
+  get num() { return C.accent; },
+  get com() { return a(C.text, 0.4); },
+  get txt() { return C.text; },
 };
 
 /** Разбивка однострочника на токены: «fn:reveal§txt:(ctx, §str:'x'§txt:);» → CodeLine. */

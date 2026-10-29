@@ -15,8 +15,17 @@ const RATE = 100;
 export async function loadPeaks(src: string): Promise<AudioInfo> {
   const res = await fetch(src);
   if (!res.ok) throw new Error(`${res.status}`);
+  return decodePeaks(src, await res.arrayBuffer());
+}
+
+/** То же для файла, который ещё не загружен на сервер (окно «Новая тема»). */
+export async function filePeaks(file: File): Promise<AudioInfo> {
+  return decodePeaks(file.name, await file.arrayBuffer());
+}
+
+async function decodePeaks(src: string, data: ArrayBuffer): Promise<AudioInfo> {
   // OfflineAudioContext декодирует файл без жеста пользователя и без вывода звука
-  const buf = await new OfflineAudioContext(1, 1, 44100).decodeAudioData(await res.arrayBuffer());
+  const buf = await new OfflineAudioContext(1, 1, 44100).decodeAudioData(data);
   const n = Math.max(1, Math.ceil(buf.duration * RATE));
   const peaks = new Float32Array(n);
   const step = buf.sampleRate / RATE;

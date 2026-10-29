@@ -1,14 +1,16 @@
 /** Типографика: стили, перенос строк, анимированное появление текста. */
 
 import { clamp01, easeOutCubic, easeOutQuart } from './anim.ts';
-import { C, FONT } from './theme.ts';
+import { C, FONT, TYPE } from './theme.ts';
 
 type Ctx = CanvasRenderingContext2D;
 
 export interface TextStyle {
   size: number;
+  /** Начертание; по умолчанию — из стиля ролика. */
   weight?: number;
-  family?: 'sans' | 'mono';
+  /** `display` — шрифт заголовков стиля (у Terevo совпадает с `sans`). */
+  family?: 'sans' | 'display' | 'mono';
   color?: string;
   align?: CanvasTextAlign;
   baseline?: CanvasTextBaseline;
@@ -20,8 +22,8 @@ export interface TextStyle {
   maxWidth?: number;
   upper?: boolean;
   /**
-   * Начертание капители. По умолчанию `small` — фирменный вид презентации
-   * (строчные буквы рисуются уменьшёнными прописными).
+   * Начертание капители. По умолчанию — из стиля ролика: у Terevo `small`
+   * (строчные буквы рисуются уменьшёнными прописными), у остальных `normal`.
    */
   caps?: 'small' | 'normal';
   glowColor?: string;
@@ -40,12 +42,14 @@ export const sizeOf = (st: Pick<TextStyle, 'size'>) => Math.max(MIN_TEXT, st.siz
 export function applyStyle(ctx: Ctx, st: TextStyle): void {
   const fam = st.family ?? 'sans';
   // Моноширинный оставляем обычным: капитель ломает выравнивание цифр.
-  const caps = st.caps ?? (fam === 'mono' ? 'normal' : 'small');
+  const caps = st.caps ?? (fam === 'mono' ? 'normal' : TYPE.caps);
   const variant = caps === 'small' ? 'small-caps ' : '';
-  ctx.font = `${variant}${st.weight ?? 700} ${sizeOf(st)}px ${FONT[fam]}`;
+  ctx.font = `${variant}${st.weight ?? TYPE.weight[fam]} ${sizeOf(st)}px ${FONT[fam]}`;
   // Дублируем отдельным свойством: не во всех сборщиках типов оно объявлено.
   (ctx as unknown as { fontVariantCaps: string }).fontVariantCaps =
     caps === 'small' ? 'small-caps' : 'normal';
+  // Язык — русский явно: без него холст вне документа берёт болгарские формы «д» и «л».
+  (ctx as unknown as { lang: string }).lang = 'ru';
   ctx.fillStyle = st.color ?? C.text;
   ctx.textAlign = st.align ?? 'left';
   ctx.textBaseline = st.baseline ?? 'alphabetic';

@@ -23,11 +23,6 @@
       canvas {
         display: block;
       }
-      @font-face {
-        font-family: 'Sofia Sans Extra Condensed';
-        src: url('/src/fonts/SofiaSansExtraCondensed-Bold.ttf') format('truetype');
-        font-weight: 100 900;
-      }
     </style>
   </head>
   <body>
@@ -35,12 +30,14 @@
     <script type="module">
       import { Timeline } from '/src/engine/timeline.ts';
       import { drawBackground } from '/src/engine/background.ts';
-      import { DISPLAY_FAMILY, FONT } from '/src/engine/theme.ts';
+      import { FONT, loadStyleFonts, setStyle } from '/src/engine/theme.ts';
       import { assetsReady } from '/src/engine/assets.ts';
 
       const q = new URLSearchParams(location.search);
       const id = q.get('deck');
       const deck = await (await fetch(`/api/decks/${id}`)).json();
+      // стиль — до импорта сцен: модуль сцены может прочитать цвета уже при загрузке
+      setStyle(deck.style);
       // file=s05_x,s06_y — взять сцены прямо из файлов, минуя index.ts
       const files = (q.get('file') ?? '').split(',').filter(Boolean);
       const scenes = new Map();
@@ -55,8 +52,7 @@
         for (const s of mod.SCENES ?? []) scenes.set(s.id, s);
       }
       try {
-        await document.fonts.load(`700 120px "${DISPLAY_FAMILY}"`);
-        await document.fonts.load(`small-caps 700 120px "${DISPLAY_FAMILY}"`);
+        await loadStyleFonts();
       } catch {}
       await assetsReady();
       const tl = new Timeline(deck, scenes);

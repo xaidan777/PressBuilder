@@ -9,6 +9,8 @@ export interface DeckMeta {
   target: number | null;
   /** У ролика уже есть код сцен (src/decks/<id>/index.ts). */
   hasScenes: boolean;
+  /** Пресет стиля (нет — Terevo). */
+  style?: string;
   mtime: number;
 }
 

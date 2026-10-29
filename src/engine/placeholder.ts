@@ -6,7 +6,7 @@
 
 import { lerp, seg } from './anim.ts';
 import { lineStep, reveal, wrap, type TextStyle } from './text.ts';
-import { a, C, H, PAD, W } from './theme.ts';
+import { a, C, currentStyle, H, PAD, TYPE, W } from './theme.ts';
 import type { SceneDef } from './types.ts';
 
 type Ctx = CanvasRenderingContext2D;
@@ -29,15 +29,19 @@ interface Layout {
 
 const cache = new Map<string, Layout>();
 
+/** Первая реплика слайда — шрифтом заголовков стиля, остальные — основным. */
+const familyOf = (i: number) => (i === 0 ? 'display' : 'sans');
+
 function layoutFor(ctx: Ctx, texts: string[]): Layout {
-  const key = texts.join('');
+  // метрики зависят от шрифтов стиля
+  const key = currentStyle().id + texts.join('');
   const hit = cache.get(key);
   if (hit) return hit;
   let best: Layout = { size: 46, gap: 20, ys: [] };
   for (const size of SIZES) {
-    const st: TextStyle = { size, maxWidth: MAX_W, lineHeight: 1.12 };
+    const st = (i: number): TextStyle => ({ size, maxWidth: MAX_W, lineHeight: 1.12, family: familyOf(i), tracking: TYPE.tracking });
     const gap = size * 0.5;
-    const heights = texts.map((t) => wrap(ctx, t, st).length * lineStep(st));
+    const heights = texts.map((t, i) => wrap(ctx, t, st(i)).length * lineStep(st(i)));
     const total = heights.reduce((s, h) => s + h, 0) + gap * Math.max(0, texts.length - 1);
     const ys: number[] = [];
     // блок центруется по вертикали в рабочей зоне
@@ -96,7 +100,8 @@ export const placeholderScene: SceneDef = {
             maxWidth: MAX_W,
             lineHeight: 1.12,
             color: fade < 0.5 ? (i === 0 ? C.h1 : C.accent) : C.text,
-            tracking: 0.6,
+            family: familyOf(i),
+            tracking: TYPE.tracking,
           },
           seg(c.t, 0, Math.min(0.9, c.dur * 0.6)),
           { stagger: 0.16, rise: 26 },

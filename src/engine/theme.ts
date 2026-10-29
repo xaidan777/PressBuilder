@@ -1,22 +1,16 @@
 /**
- * Единая палитра и типографика презентации.
- * Менять цвета только здесь — сцены обращаются к C.*
+ * Палитра и типографика презентации. Значения приходят из пресета стиля ролика
+ * (`styles.ts`, поле `style` в deck.json): `setStyle()` подменяет их перед рисованием.
+ * Поэтому сцены читают `C.*` и `FONT.*` прямо в render(), а не копируют в константы
+ * модуля — иначе смена стиля не дойдёт до сцены.
  */
 
-export const C = {
-  /** Фон канваса */
-  bg: '#32353c',
-  /** Альтернативный фон (таблицы, панели, карточки) */
-  panel: '#2d3036',
-  /** Основной текст */
-  text: '#cfd2d3',
-  /** Заголовки 1 */
-  h1: '#51d3ff',
-  /** Альтернативные заголовки / акценты */
-  accent: '#ffcf75',
-  /** Акцент для мелкого текста (дельты, метки) */
-  pos: '#b5db41',
-} as const;
+import { PRESETS, styleById, type Palette, type StylePreset } from './styles.ts';
+
+export type { Palette, StylePreset } from './styles.ts';
+
+/** Цвета текущего стиля: bg, panel, text, h1, accent, pos. */
+export const C: Palette = { ...PRESETS[0].colors };
 
 /** Цвет с альфой: rgba() из hex. */
 export function a(hex: string, alpha: number): string {
@@ -49,14 +43,74 @@ export function mix(hexA: string, hexB: string, k: number): string {
 }
 
 export const FONT = {
-  /** Основной дисплейный шрифт презентации (узкий, только Bold). */
-  sans: "'Sofia Sans Extra Condensed', 'Segoe UI', system-ui, sans-serif",
+  /** Основной текст. */
+  sans: PRESETS[0].fonts.sans.stack,
+  /** Заголовки и крупный текст (у Terevo — тот же узкий шрифт). */
+  display: PRESETS[0].fonts.display.stack,
   /** Моноширинный — для табличных цифр и «логов». */
   mono: "'Cascadia Mono', Consolas, ui-monospace, monospace",
-} as const;
+};
 
-/** Имя семейства для предзагрузки через document.fonts. */
-export const DISPLAY_FAMILY = 'Sofia Sans Extra Condensed';
+/** Типографика текущего стиля: начертания по умолчанию, капитель, трекинг крупного текста. */
+export const TYPE = {
+  weight: { sans: 700, display: 700, mono: 700 },
+  caps: 'small' as 'small' | 'normal',
+  tracking: 0.6,
+};
+
+let current: StylePreset = PRESETS[0];
+
+export const currentStyle = (): StylePreset => current;
+
+/** Включить пресет стиля (id из deck.json; пусто или неизвестно — Terevo). */
+export function setStyle(id: string | null | undefined): StylePreset {
+  const s = styleById(id);
+  if (s === current) return s;
+  current = s;
+  Object.assign(C, s.colors);
+  FONT.sans = s.fonts.sans.stack;
+  FONT.display = s.fonts.display.stack;
+  TYPE.weight.sans = s.fonts.sans.weight;
+  TYPE.weight.display = s.fonts.display.weight;
+  TYPE.caps = s.caps;
+  TYPE.tracking = s.tracking;
+  return s;
+}
+
+/** Нарисовать что-то в другом стиле и вернуть прежний (превью в окне выбора). */
+export function withStyle<T>(id: string, fn: () => T): T {
+  const prev = current.id;
+  setStyle(id);
+  try {
+    return fn();
+  } finally {
+    setStyle(prev);
+  }
+}
+
+let fontsReady: Promise<void> | null = null;
+
+/**
+ * Шрифты всех пресетов — до первой отрисовки, иначе метрики текста поедут.
+ * Регистрируются в document.fonts, так что ими пользуется и интерфейс редактора.
+ */
+export function loadStyleFonts(): Promise<void> {
+  if (typeof document === 'undefined' || typeof FontFace === 'undefined') return Promise.resolve();
+  fontsReady ??= (async () => {
+    const seen = new Set<string>();
+    const jobs: Promise<unknown>[] = [];
+    for (const f of PRESETS.flatMap((p) => [p.fonts.display, p.fonts.sans])) {
+      if (seen.has(f.url)) continue;
+      seen.add(f.url);
+      const face = new FontFace(f.family, `url("${f.url}") format("truetype")`, { weight: '100 900', display: 'block' });
+      document.fonts.add(face);
+      jobs.push(face.load().catch(() => undefined));
+    }
+    await Promise.all(jobs);
+    await document.fonts.ready;
+  })();
+  return fontsReady;
+}
 
 /** Логический размер сцены. Всё рисуется в этих координатах. */
 export const W = 1920;

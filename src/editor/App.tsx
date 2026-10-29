@@ -1,12 +1,14 @@
 /** Каркас редактора: стартовый экран со списком тем или рабочее пространство ролика. */
 
 import { useEffect, useState } from 'preact/hooks';
+import { styleById } from '../engine/styles.ts';
 import { patchObj } from './actions.ts';
 import { api, type DeckMeta } from './api.ts';
 import { DeckDialog } from './DeckDialog.tsx';
 import { ExportDialog } from './ExportDialog.tsx';
 import { Inspector } from './Inspector.tsx';
 import { ScriptPanel } from './ScriptPanel.tsx';
+import { StyleDialog } from './StyleDialog.tsx';
 import { Stage } from './Stage.tsx';
 import {
   canRedo,
@@ -40,7 +42,7 @@ import { TimelinePanel } from './TimelinePanel.tsx';
 import { Icon, IconBtn, MenuBtn } from './ui.tsx';
 import { clock, isTyping, nSlides } from './util.ts';
 
-type Modal = null | 'new' | 'resplit' | 'export' | 'export-auto';
+type Modal = null | 'new' | 'resplit' | 'style' | 'export' | 'export-auto';
 
 const SAVE_TEXT = { saved: 'сохранено', dirty: 'изменено', saving: 'сохраняю…', error: 'не сохранилось' };
 
@@ -150,6 +152,7 @@ export function App() {
             <span class="tl-spacer" />
             <IconBtn icon="undo" label="Отменить (Ctrl+Z)" disabled={!canUndo.value} onClick={undo} />
             <IconBtn icon="redo" label="Вернуть (Ctrl+Shift+Z)" disabled={!canRedo.value} onClick={redo} />
+            <StyleChip style={d.style} onClick={() => setModal('style')} />
             <button type="button" class="btn" onClick={() => setModal('resplit')}>
               <Icon name="text" size={15} /> Текст и разбивка
             </button>
@@ -169,11 +172,32 @@ export function App() {
 
       {modal === 'new' && <DeckDialog mode="new" onClose={() => setModal(null)} />}
       {modal === 'resplit' && <DeckDialog mode="resplit" onClose={() => setModal(null)} />}
+      {modal === 'style' && <StyleDialog onClose={() => setModal(null)} />}
       {(modal === 'export' || modal === 'export-auto') && (
         <ExportDialog autoStart={modal === 'export-auto'} slides={modal === 'export-auto' ? exportSlides : undefined} onClose={() => setModal(null)} />
       )}
       {toast.value && <div class="toast">{toast.value}</div>}
     </>
+  );
+}
+
+/** Кружки палитры стиля: фон, h1, accent, pos. */
+function Swatches({ style }: { style?: string }) {
+  const c = styleById(style).colors;
+  return (
+    <span class="style-swatches" aria-hidden="true">
+      {[c.bg, c.h1, c.accent, c.pos].map((x) => (
+        <i key={x} style={{ background: x }} />
+      ))}
+    </span>
+  );
+}
+
+function StyleChip({ style, onClick }: { style?: string; onClick(): void }) {
+  return (
+    <button type="button" class="btn" title="Стиль ролика: палитра, шрифты, фон" onClick={onClick}>
+      <Swatches style={style} /> {styleById(style).name}
+    </button>
   );
 }
 
@@ -215,7 +239,7 @@ function Home({ onNew }: { onNew(): void }) {
 
         <ol class="steps">
           <li>
-            <b>1</b> Создай тему: заголовок, текст, число слайдов — время разложится само.
+            <b>1</b> Создай тему: выбери стиль, вставь текст и приложи озвучку — время разложится само.
           </li>
           <li>
             <b>2</b> Скажи в чате Claude Code или Codex: <em>«делай тему …»</em> — агент нарисует сцены.
@@ -245,6 +269,9 @@ function Home({ onNew }: { onNew(): void }) {
               <p>
                 {m.id} · {nSlides(m.slides)}
                 {m.target ? ` · ${clock(m.target)}` : ''}
+              </p>
+              <p class="deck-card-style">
+                <Swatches style={m.style} /> {styleById(m.style).name}
               </p>
             </div>
           ))}

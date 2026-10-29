@@ -116,6 +116,7 @@ export function presbuilder(): Plugin {
             slides: Array.isArray(deck.slides) ? deck.slides.length : 0,
             target: deck.target ?? null,
             hasScenes: fs.existsSync(path.join(DECKS_DIR, d.name, 'index.ts')),
+            style: typeof deck.style === 'string' ? deck.style : undefined,
             mtime: fs.statSync(deckFile(d.name)).mtimeMs,
           };
         } catch {

@@ -175,11 +175,13 @@ interface DialogProps {
   children: ComponentChildren;
   footer?: ComponentChildren;
   wide?: boolean;
+  /** Ещё шире: форма и превью рядом. */
+  xwide?: boolean;
   /** Нельзя закрыть (идёт рендер). */
   locked?: boolean;
 }
 
-export function Dialog({ title, onClose, children, footer, wide, locked }: DialogProps) {
+export function Dialog({ title, onClose, children, footer, wide, xwide, locked }: DialogProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !locked) onClose();
@@ -190,7 +192,7 @@ export function Dialog({ title, onClose, children, footer, wide, locked }: Dialo
 
   return (
     <div class="dialog-back" onPointerDown={(e) => e.target === e.currentTarget && !locked && onClose()}>
-      <div class={`dialog ${wide ? 'is-wide' : ''}`} role="dialog" aria-label={title}>
+      <div class={`dialog ${wide ? 'is-wide' : ''} ${xwide ? 'is-xwide' : ''}`} role="dialog" aria-label={title}>
         <header class="dialog-head">
           <h2>{title}</h2>
           {!locked && <IconBtn icon="close" label="Закрыть" onClick={onClose} />}

@@ -15,13 +15,17 @@
 
 ## theme.ts — палитра и кадр
 
-- `C.bg`, `C.panel`, `C.text`, `C.h1` (голубой, заголовки), `C.accent` (жёлтый), `C.pos` (зелёный, плюсы).
+- `C.bg`, `C.panel`, `C.text`, `C.h1` (заголовки), `C.accent` (второй акцент), `C.pos` (мелкий акцент: дельты,
+  метки). Значения задаёт стиль ролика (`styles.ts`), поэтому `C.*` читать внутри `render()`, не в константах модуля.
+- `currentStyle()` — пресет ролика: `id`, `dark`, `radius` (скругление плашек), `cardLines` (1 — тонкая рамка,
+  2 — двойная скруглённая), `caps`, `tracking`. `FONT.sans` / `FONT.display` / `FONT.mono` — стеки шрифтов.
 - `a(color, alpha)` — цвет с прозрачностью, `mix(a, b, k)` — смесь (hex — годится и в `a()`).
 - `W = 1920`, `H = 1080`, `PAD = { x: 150, y: 110 }`, `SAFE_BOTTOM = 150`.
 
 ## text.ts — текст
 
-Стиль `TextStyle`: `{ size, weight?, color?, align?, tracking?, lineHeight?, maxWidth?, upper?, caps?, glowColor?, glowBlur? }`.
+Стиль `TextStyle`: `{ size, weight?, family?, color?, align?, tracking?, lineHeight?, maxWidth?, upper?, caps?, glowColor?, glowBlur? }`.
+`family: 'display'` — шрифт заголовков стиля, по умолчанию `sans`; `weight` и `caps` по умолчанию — из стиля.
 Кегль меньше `MIN_TEXT = 46` движок поднимет сам.
 
 - `reveal(ctx, str, x, y, st, p, { stagger?, rise?, slide?, from?, mask? })` — пословное появление. Главный способ

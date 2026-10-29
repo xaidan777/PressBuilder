@@ -3,7 +3,7 @@
 import { clamp01, seg } from './anim.ts';
 import { placeholderScene } from './placeholder.ts';
 import { buildSchedule, slideAt, type SchedCue, type SchedSlide, type Schedule } from './schedule.ts';
-import { C, FONT, H, SAFE_BOTTOM, W } from './theme.ts';
+import { C, FONT, H, SAFE_BOTTOM, setStyle, W } from './theme.ts';
 import { TIMING } from './timing.ts';
 import type { CueTime, DeckData, Frame, ObjOpts, ObjState, SceneDef } from './types.ts';
 
@@ -113,6 +113,7 @@ export class Timeline {
   private renderSlide(ctx: Ctx, gt: number, probe: Probe | null): void {
     const sc = this.slideAt(gt);
     if (!sc) return;
+    setStyle(this.deck.style);
     const slide = sc.slide;
     const scene = this.scenes.get(slide.id) ?? placeholderScene;
     const t = gt - sc.start;

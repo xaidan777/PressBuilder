@@ -7,7 +7,7 @@
 import { onAsset } from './assets.ts';
 import { drawBackground } from './background.ts';
 import { Timeline } from './timeline.ts';
-import { H, W } from './theme.ts';
+import { H, setStyle, W } from './theme.ts';
 
 export class Player {
   readonly canvas: HTMLCanvasElement;
@@ -183,6 +183,8 @@ export class Player {
     const sy = this.canvas.height / H;
     ctx.setTransform(sx, 0, 0, sy, 0, 0);
     ctx.globalAlpha = 1;
+    // стиль ролика — до фона: фон у каждого стиля свой
+    if (this.tl) setStyle(this.tl.deck.style);
     drawBackground(ctx, this.time, this.tl?.energyAt(this.time) ?? 0);
     this.tl?.render(ctx, this.time);
   }

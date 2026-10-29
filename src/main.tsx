@@ -3,16 +3,12 @@ import './editor/editor.css';
 import { render } from 'preact';
 import { App } from './editor/App.tsx';
 import * as store from './editor/store.ts';
-import { DISPLAY_FAMILY } from './engine/theme.ts';
+import { loadStyleFonts } from './engine/theme.ts';
 
-/** Шрифт обязателен до первой отрисовки, иначе метрики текста поедут. */
+/** Шрифты стилей обязательны до первой отрисовки, иначе метрики текста поедут. */
 async function loadFonts(): Promise<void> {
   try {
-    await Promise.all([
-      document.fonts.load(`700 120px "${DISPLAY_FAMILY}"`),
-      document.fonts.load(`small-caps 700 120px "${DISPLAY_FAMILY}"`),
-    ]);
-    await document.fonts.ready;
+    await loadStyleFonts();
   } catch {
     /* шрифт не загрузился — рисуем системным */
   }

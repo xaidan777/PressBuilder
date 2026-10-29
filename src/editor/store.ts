@@ -9,7 +9,7 @@ import { loadScenes } from '../decks/registry.ts';
 import { Player } from '../engine/player.ts';
 import { slideAt } from '../engine/schedule.ts';
 import { Timeline, type ObjInfo } from '../engine/timeline.ts';
-import { W } from '../engine/theme.ts';
+import { setStyle, W } from '../engine/theme.ts';
 import type { DeckData, SceneDef } from '../engine/types.ts';
 import { api, CLIENT_ID, type DeckMeta } from './api.ts';
 import { loadPeaks, type AudioInfo } from './audio.ts';
@@ -316,7 +316,10 @@ export async function openDeck(id: string, at = 0): Promise<void> {
   await flushSave();
   loading.value = true;
   try {
-    const [data, sc] = await Promise.all([api.getDeck(id), loadScenes(id)]);
+    // стиль — до загрузки сцен: модуль сцены может прочитать цвета уже при импорте
+    const data = await api.getDeck(id);
+    setStyle(data.style);
+    const sc = await loadScenes(id);
     player?.pause();
     resetHistory();
     sel.value = { kind: 'none' };

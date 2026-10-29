@@ -83,6 +83,8 @@ export interface DeckData {
   slides: SlideData[];
   /** Озвучка: играет в редакторе и попадает в MP4. */
   audio?: DeckAudio;
+  /** Пресет стиля (`engine/styles.ts`): палитра, шрифты, фон. Нет — Terevo. */
+  style?: string;
 }
 
 // ------------------------------------------------------------------ рендер
