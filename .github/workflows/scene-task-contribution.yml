@@ -1,0 +1,33 @@
+name: Scene task contribution tests
+
+on:
+  push:
+    branches:
+      - contrib/scene-task-checkpoints
+  pull_request:
+    paths:
+      - 'server/plugin.ts'
+      - 'server/scene-tasks.*'
+      - 'tests/scene-tasks*.test.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  scene-task-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.20.0'
+          cache: npm
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Scene task unit and API integration tests
+        run: node --test tests/scene-tasks.test.mjs tests/scene-tasks-http.test.mjs
+      - name: TypeScript typecheck
+        run: npm run typecheck
+      - name: Production build
+        run: npm run build

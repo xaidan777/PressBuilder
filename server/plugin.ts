@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { sceneTaskStore, type SceneTaskChanges, type SceneCheckpoint } from './scene-tasks.mjs';
 import type { Plugin, ViteDevServer } from 'vite';
 
 const ROOT = process.cwd();
@@ -71,6 +72,33 @@ function readBody(req: IncomingMessage): Promise<Buffer> {
   });
 }
 
+/** Bound agent assignment requests without restricting larger voice uploads. */
+function readTaskBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    const maxBytes = 128 * 1024;
+    let received = 0;
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => {
+      received += chunk.length;
+      if (received <= maxBytes) chunks.push(chunk);
+    });
+    req.on('end', () => {
+      if (received > maxBytes) {
+        reject(Object.assign(new Error('Scene assignment request is too large'), { status: 413 }));
+        return;
+      }
+      try {
+        const parsed: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Expected JSON object');
+        resolve(parsed as Record<string, unknown>);
+      } catch {
+        reject(Object.assign(new Error('Invalid scene assignment JSON'), { status: 400 }));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
 function json(res: ServerResponse, data: unknown, status = 200): void {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -94,6 +122,17 @@ function writeAtomic(file: string, content: string): void {
 export function presbuilder(): Plugin {
   /** Что сервер сам записал последним — чтобы не слать редактору эхо его же сохранений. */
   const written = new Map<string, string>();
+  const taskStore = sceneTaskStore({
+    root: DECKS_DIR,
+    getDeck: (id: string) => {
+      if (!ID_RE.test(id) || !fs.existsSync(deckFile(id)))
+        throw Object.assign(new Error('Project not found'), { status: 404 });
+      const deck: unknown = JSON.parse(fs.readFileSync(deckFile(id), 'utf8'));
+      if (!deck || typeof deck !== 'object' || !Array.isArray((deck as { slides?: unknown }).slides))
+        throw Object.assign(new Error('Invalid project scenes'), { status: 422 });
+      return deck as { slides: { id: string; label?: string }[] };
+    },
+  });
   let vite: ViteDevServer | null = null;
 
   /** Ролик изменился: сообщаем всем вкладкам, кроме той, что сама его сохранила. */
@@ -141,6 +180,35 @@ export function presbuilder(): Plugin {
         return json(res, { ok: true });
       }
       return fail(res, 405, 'method');
+    }
+
+    // Independent task metadata: never rewrites deck.json or generated scene code.
+    const task = /^([^/]+)\/tasks(?:\/([^/]+)(?:\/checkpoints\/([^/]+))?)?$/.exec(rest);
+    if (task) {
+      const [, id, scene, checkpointId] = task;
+      if (!ID_RE.test(id) || !fs.existsSync(deckFile(id))) return fail(res, 404, 'Project not found');
+      try {
+        if (!scene) {
+          if (req.method !== 'GET') return fail(res, 405, 'method');
+          return json(res, taskStore.list(id));
+        }
+        if (checkpointId) {
+          if (req.method !== 'PATCH') return fail(res, 405, 'method');
+          const body = (await readTaskBody(req)) as Partial<Pick<SceneCheckpoint, 'done' | 'note'>> & { expected_revision?: number };
+          const { expected_revision, ...patch } = body;
+          return json(res, taskStore.checkpoint(id, scene, checkpointId, patch, expected_revision as number));
+        }
+        if (req.method === 'GET') return json(res, taskStore.read(id, scene));
+        if (req.method === 'PUT') {
+          const body = (await readTaskBody(req)) as SceneTaskChanges & { expected_revision?: number };
+          const { expected_revision, ...fields } = body;
+          return json(res, taskStore.put(id, scene, fields, expected_revision as number));
+        }
+        return fail(res, 405, 'method');
+      } catch (e) {
+        const status = Number((e as { status?: number })?.status || 500);
+        return fail(res, status, e instanceof Error ? e.message : String(e));
+      }
     }
 
     const audio = /^([^/]+)\/audio$/.exec(rest);
